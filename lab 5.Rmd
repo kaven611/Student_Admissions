@@ -1,0 +1,105 @@
+---
+title: "Lab 5"
+author: "Kaven Rempel"
+date: "3/17/2022"
+output: 
+  html_document:
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(dev="png",
+                      echo = FALSE,
+                      cache = TRUE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+```{r,include=FALSE}
+library(ggplot2) # for plots
+library(class) # for KNN
+library(caTools) # for splitting data to train/test
+
+uniData <- read.table("https://publish.uwo.ca/~lsincla3/docs/admit.txt")
+str(uniData)
+uniData$admit <- as.factor(uniData$admit)
+uniData$rank <- as.factor(uniData$rank)
+
+```
+
+```{r}
+plot(uniData)
+```
+
+```{r, include=FALSE}
+set.seed(678) 
+sample <- sample.split(uniData$admit, SplitRatio=.75)
+train <- subset(uniData, sample == TRUE)
+test <- subset(uniData, sample == FALSE)
+```
+
+```{r}
+fit_glm1 <- glm(admit~gre+gpa+rank, data = train,family = binomial(link = "logit"))
+
+``` 
+
+
+```{r}
+diffDev1 <- fit_glm1$null.deviance - fit_glm1$deviance
+diffDf1 <- fit_glm1$df.null - fit_glm1$df.residual
+
+diffDf1 # difference in degrees of freedom
+
+round(diffDev1,3) # differences in deviance
+
+
+round(1-pchisq(diffDev1,diffDf1),4) # compute p-val
+
+```
+### Chi-Square Test
+We can see that the p-value is essentially zero. The smaller the p-value the better fit is the model. Therefore, this model is a good fit.
+
+```{r}
+glm.probs1 <- predict(fit_glm1,newdata = test,type="response")
+glm.pred1 <- ifelse(glm.probs1>0.5,"1","0")
+
+
+table(glm.pred1,test$admit) # confusion matrix using test set
+mean(glm.pred1 == test$admit) # test for accuracy
+```
+### Accuracy of Logistic Regression Model
+Based on the confusion matrix we can see that the accuracy rate ((TP+TN)/n) is 72%.
+
+```{r}
+train.X <- cbind(train$gre,train$gpa,train$rank) # predictors of train data
+test.X <- cbind(test$gre,test$gpa,test$rank) # test set
+
+set.seed(1) # in case there is a tie, R will break it randomly
+knn.pred1 <- knn(train.X,test.X,train$admit,k=3, prob=T)
+
+table(knn.pred1,test$admit)
+mean(knn.pred1 == test$admit) # test for accuracy
+
+```
+### Accuracy Comparision of KNN vs. Logistic Regression Classification Models
+Based on the confusion matrix we see that the accuracy rate for the KNN model is 62%. Comparing the accuracy rate of both the logistic and KNN classification models we see that the logistic model has a higher accuracy rate of 72%. Therefore, the logistic model makes an accurate prediction 10% more of the time than the KNN classifier. Conclusively, based on on the accuracy rate alone the logistic model has a better performance. 
+
+```{r}
+glm1_acc <- ifelse(glm.pred1 == test$admit,"1","0")
+
+ggplot(data = test,aes(gre, gpa, color=glm1_acc))+
+  geom_point()+facet_wrap(~rank)+
+  labs(title = "Student Admission Logistic Model Predictions", 
+       x="Graduate Record Exam Scores",y="GPA", color = "Accepted")
+```
+
+```{r}
+knn1_acc <- ifelse(knn.pred1 == test$admit,"1","0")
+
+ggplot(data = test,aes(gre, gpa, color=knn1_acc))+
+  geom_point()+facet_wrap(~rank)+
+  labs(title = "Student Admission KNN Classifier Predictions", 
+       x="Graduate Record Exam Scores",y="GPA", color = "Accepted")
+
+```
+
